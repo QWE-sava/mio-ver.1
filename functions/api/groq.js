@@ -1,50 +1,43 @@
 export async function onRequestPost(context) {
-    // 1. 環境変数からAPIキーを取得
-    const GROQ_API_KEY = context.env.GROQ_API_KEY;
+    // 1. 環境変数を OpenAI 用に読み替え
+    const OPENAI_API_KEY = context.env.OPENAI_API_KEY;
     
-    if (!GROQ_API_KEY) {
-        return new Response(JSON.stringify({ error: "環境変数 GROQ_API_KEY が設定されていません。Cloudflareの管理画面を確認してください。" }), { status: 500 });
+    if (!OPENAI_API_KEY) {
+        return new Response(JSON.stringify({ error: "OpenAIのAPIキーが設定されていません。" }), { status: 500 });
     }
 
     try {
-        // フロントエンドからの入力を取得
         const { text } = await context.request.json();
 
-        // Groq API (Gemma 2 9B) へのリクエスト
-        const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+        // 2. OpenAI API (GPT-4o mini) を叩く
+        // 読み上げ用なら mini で十分賢く、かつ料金も激安です
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${GROQ_API_KEY}`,
+                "Authorization": `Bearer ${OPENAI_API_KEY}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: "gemma2-9b-it", // Googleの軽量・高性能モデルを指定
+                model: "gpt-4o-mini", 
                 messages: [
                     { 
                         role: "system", 
-                        content: `あなたは日本語の文章を、読み上げ用の「ひらがな」に変換する専門家です。
-以下のルールを厳守してください：
-1. 文脈（文全体の流れ）を読み取り、適切な読みを選択すること。
-2. 「下手」：舞台用語や位置（〜から登場、〜に座る等）なら「しもて」、技量（苦手）なら「へた」。
-3. 「最中」：食べ物なら「もなか」、〜している時なら「さいちゅう」。
-4. 「人気」：気配なら「ひとけ」、評判なら「にんき」。
-        // エラーハンドリング
-        if (!response.ok) {
-            const errorData = await response.text();
-            return new Response(JSON.stringify({ error: `Groq API Error: ${response.status} - ${errorData}` }), { status: response.status });
-        }
+                        content: "日本語の読み上げ用変換器です。漢字を文脈に合わせて正確な『ひらがな』と『句読点』のみに変換してください。解説は一切不要です。" 
+                    },
+                    { role: "user", content: text }
+                ],
+                temperature: 0
+            })
+        });
 
         const data = await response.json();
         const reading = data.choices[0].message.content.trim();
 
-        // フロントエンドに結果を返す
         return new Response(JSON.stringify({ reading }), {
-            headers: { 
-                "Content-Type": "application/json;charset=UTF-8"
-            }
+            headers: { "Content-Type": "application/json;charset=UTF-8" }
         });
 
     } catch (e) {
-        return new Response(JSON.stringify({ error: `Internal Server Error: ${e.message}` }), { status: 500 });
+        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
     }
 }

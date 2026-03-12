@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>意思伝達支援システム：澪 (MIO)</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; background: #f0f2f5; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
+        input { width: 90%; padding: 15px; font-size: 18px; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 20px; }
+        button { background: #f6500a; color: white; border: none; padding: 15px 30px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; }
+        #status { margin-top: 15px; font-size: 14px; color: #666; }
+        #result { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; border-left: 5px solid #f6500a; text-align: left; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>意思伝達支援システム：澪 (MIO)</h1>
+    <input type="text" id="inputText" placeholder="文章を入力してください" value="最中を食べる">
+    <button id="speakBtn">喋る</button>
+    <div id="status">待機中</div>
+    <div id="result"><strong>AIの判断:</strong> <span id="readingText">---</span></div>
+</div>
+
+<script>
+    const speakBtn = document.getElementById('speakBtn');
+    const inputText = document.getElementById('inputText');
+    const readingText = document.getElementById('readingText');
+    const statusLabel = document.getElementById('status');
+
+    speakBtn.addEventListener('click', async () => {
+        const text = inputText.value;
+        if (!text) return;
+
+        speakBtn.disabled = true;
+        statusLabel.innerText = "解析中...";
+
+        try {
+            // 自作のAPI（Functions）を叩く
+            const response = await fetch("/api/groq", {
+                method: "POST",
+                body: JSON.stringify({ text: text }),
+                headers: { "Content-Type": "application/json" }
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            readingText.innerText = data.reading;
+            
+            // 読み上げ
+            const utter = new SpeechSynthesisUtterance(data.reading);
+            utter.lang = 'ja-JP';
+            utter.onend = () => {
+                statusLabel.innerText = "待機中";
+                speakBtn.disabled = false;
+            };
+            window.speechSynthesis.speak(utter);
+
+        } catch (error) {
+            alert("エラー: " + error.message);
+            speakBtn.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>
